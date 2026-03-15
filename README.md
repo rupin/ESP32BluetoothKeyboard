@@ -14,7 +14,7 @@ Unlike standard BLE libraries that suffer from infinite disconnect/reconnect loo
 
 ## ⚠️ The Elephant in the Room: The "First-Time Crash" (Dirty Save)
 
-If you run this code and pair it to Windows for the first time, your ESP32 will likely throw a terrifying wall of red text in Thonny:
+If you run this code and pair it to Windows for the first time, your ESP32 will likely throw a terrifying wall of red text in your IDE console:
 `Guru Meditation Error: Core 1 panic'ed (LoadProhibited). Exception was unhandled.`
 
 **Do not panic. This is an intended feature.**
@@ -38,10 +38,8 @@ It effectively turns a kernel panic into an automated "One-Time Setup Reboot"!
 ## 🚀 Installation
 
 1. Flash your ESP32 with **MicroPython v1.20 or newer** (v1.27+ recommended).
-2. Using Thonny IDE, upload the following files to your ESP32's root directory:
-   * `ble_keyboard.py` (The main library)
-   * `main.py` (Your execution code)
-3. Disconnect and reconnect power to the ESP32.
+2. Using your preferred IDE (Thonny is highly recommended for beginners), upload the `ble_keyboard.py` library file to the root directory of your ESP32.
+3. Once the library is saved to the board, you can open `main.py` in your IDE, paste any of the example codes below, and click "Run" to execute it directly on the board.
 
 ---
 
@@ -54,7 +52,8 @@ To use the library, instantiate the `BLEKeyboard` object and wait for a connecti
 from ble_keyboard import BLEKeyboard
 import time
 
-kb = BLEKeyboard("ESP32_MyKeyboard")
+# IMPORTANT: Keep the name under 15 characters!
+kb = BLEKeyboard("ESP32_MyKb")
 
 while True:
     if kb.is_connected():
@@ -114,7 +113,7 @@ pair_btn = Pin(0, Pin.IN, Pin.PULL_UP)
 
 if pair_btn.value() == 0:
     # Button held: Bypass Windows cache with new name
-    device_name = f"ESP32_KB_{random.randint(100, 999)}"
+    device_name = f"ESP_KB_{random.randint(100, 999)}"
 else:
     # Normal boot
     device_name = "ESP32_KB_Main"
@@ -129,27 +128,28 @@ kb = BLEKeyboard(device_name)
 
 Building this library exposed several obscure bugs in the intersection between Windows 11, macOS, and MicroPython. If you are modifying this library, keep these documented vagaries in mind:
 
-### 1. The Missing MicroPython Constants
+### 1. The 15-Character Name Limit (The 31-Byte Payload Bug)
+If you try to name your device something long like `BLEKeyboard("My_Awesome_ESP32_Keyboard")`, **the ESP32 will crash with an `OSError: [Errno 12] ENOMEM` or simply fail to advertise.**
+
+This happens because the total size of a Bluetooth Legacy Advertising Packet is strictly limited to **31 bytes** by the BLE specification. 
+In our `adv.extend()` packet:
+* 3 bytes are used for standard BLE Flags.
+* 4 bytes are used for the Keyboard Appearance Icon (so it shows up as a keyboard in Windows).
+* 6 bytes are used for the Service UUIDs.
+* 2 bytes are used for the Name Header.
+
+This leaves exactly **16 bytes remaining for your device name string.** To be safe, keep your `name=` parameter to **15 characters or less**.
+
+### 2. The Missing MicroPython Constants
 To force Windows 11 to initiate a bonding sequence, the BLE Characteristics must be flagged as encrypted. However, MicroPython 1.27 forgot to expose the text variables for these flags! 
 In `ble_keyboard.py`, you will notice we hardcoded the raw hex values (e.g., `0x0200` for `FLAG_READ_ENCRYPTED`). Do not change these, or Windows will refuse to pair.
 
-### 2. Memoryviews vs. JSON serialization
+### 3. Memoryviews vs. JSON serialization
 When MicroPython triggers `_IRQ_SET_SECRET` to hand over the Bluetooth passwords, it provides them as `memoryview` objects. The standard Python `json.dump()` function will crash with a `TypeError` if you try to save a memoryview or a `bytes` object. We bypass this complexity entirely by relying on the "dirty save" crash, but if you attempt to rewrite this using standard JSON saves, you must convert keys to `.hex()` strings first.
 
-### 3. Mac Name Caching vs. Windows Caching
+### 4. Mac Name Caching vs. Windows Caching
 * **Windows 11** enforces a strict paired-device limit (usually 7-8 devices). If you use a random name generator on *every* boot, Windows will quickly hit this limit and permanently block the ESP32.
 * **macOS** ignores random names if the hardware MAC address remains the same. It aggressively caches the MAC address and will force the name back to whatever it was called the first time it paired. 
-
-### 4. The Thonny IDE `_tkinter.TclError`
-After the ESP32 successfully saves `ble_secrets.json`, you might try to double-click it in the Thonny sidebar to see what the keys look like. **Thonny will crash with an error:**
-`_tkinter.TclError: ... is not managed by editornotebook`
-*This is a bug in the Thonny GUI, not your code.* Thonny struggles to render JSON files containing stringified byte-data. 
-To view the file, use the REPL shell instead:
-```python
-import json
-with open('ble_secrets.json', 'r') as f:
-    print(json.load(f))
-```
 
 ---
 
