@@ -58,73 +58,132 @@ The provided example script turns your ESP32 into a two-button touch keyboard.
 
 ---
 
-## 📖 Usage Guide
+## 💡 Project Inspiration & Build Guides
 
-### 🟢 Level 1: Beginner (Basic Keystrokes)
-To use the library in your own projects, instantiate the `BLEKeyboard` object and wait for a connection.
+Because the ESP32 acts exactly like a standard USB keyboard, you can use it to interact with almost any software. Here are 5 hardware projects you can build right now.
 
-```python
-from ble_keyboard import BLEKeyboard
-import time
-
-# IMPORTANT: Keep the name under 15 characters!
-kb = BLEKeyboard("ESP32_MyKb")
-
-while True:
-    if kb.is_connected():
-        print("Typing hello...")
-        kb.type_text("Hello World!\n")
-        time.sleep(5)
-```
-
-### 🟡 Level 2: Intermediate (Touch Pins & Modifiers)
-You can map the built-in capacitive touch pins on the ESP32 to specific actions. This requires basic debouncing (waiting for the user to lift their finger) so it doesn't spam the computer with 500 keystrokes a second.
-
+### 🏎️ 1. Cardboard Racing Controller (For Asphalt or Need for Speed)
+Turn a piece of cardboard into a wireless steering wheel!
+* **The Build:** Cut a steering wheel out of cardboard. Tape a patch of aluminum foil to the left grip, and another patch to the right grip. Connect Pin 4 to the left foil, and Pin 13 to the right foil.
+* **How it works:** When you hold the foil on the left, the ESP32 holds down the left arrow. 
+* **The Code:**
 ```python
 from ble_keyboard import BLEKeyboard
 from machine import Pin, TouchPad
 import time
 
-kb = BLEKeyboard("Touch_Keyboard")
-touch_left = TouchPad(Pin(4))
-THRESHOLD = 300 
-
-connection_ready = False
+kb = BLEKeyboard("ESP_Wheel")
+left_pad = TouchPad(Pin(4))
+right_pad = TouchPad(Pin(13))
+THRESHOLD = 300
 
 while True:
     if kb.is_connected():
-        # Add a small delay on first connection for OS security handshake
-        if not connection_ready:
-            time.sleep(2)
-            connection_ready = True
-
-        try:
-            if touch_left.read() < THRESHOLD:
-                # Copy text using modifier (Ctrl+C)
-                kb.ctrl_c() 
-
-                # Wait for finger release (Debounce)
-                while touch_left.read() < THRESHOLD: 
-                    time.sleep_ms(20)
-        except ValueError:
-            pass
-    else:
-        connection_ready = False
-
+        if left_pad.read() < THRESHOLD:
+            kb.arrow_left()
+        elif right_pad.read() < THRESHOLD:
+            kb.arrow_right()
     time.sleep_ms(50)
 ```
 
----
+### 🍌 2. Capacitive-Touch Banana Piano
+Play an online synthesizer using fruit.
+* **The Build:** Get 5 bananas. Push a jumper wire into each one. Connect the other ends to ESP32 Touch Pins (e.g., 4, 13, 14, 27, 33). 
+* **How it works:** Open a browser-based piano. Touching a banana triggers a specific letter key to play a musical note.
+* **The Code:**
+```python
+from ble_keyboard import BLEKeyboard
+from machine import Pin, TouchPad
+import time
 
-## 💡 Project Inspiration (What can you build with this?)
+kb = BLEKeyboard("Banana_Piano")
+keys = {
+    'a': TouchPad(Pin(4)),
+    's': TouchPad(Pin(13)),
+    'd': TouchPad(Pin(14)),
+    'f': TouchPad(Pin(27)),
+    'g': TouchPad(Pin(33))
+}
 
-Because the ESP32 acts exactly like a standard USB keyboard, you can use it to interact with almost any software. Here are 5 project ideas to get you started:
+while True:
+    if kb.is_connected():
+        for letter, pad in keys.items():
+            if pad.read() < 300:
+                kb.type_text(letter)
+                # Wait for you to let go of the banana!
+                while pad.read() < 300: 
+                    time.sleep_ms(20)
+    time.sleep_ms(20)
+```
 
-1. **Cardboard Racing Controller:** Games like *Asphalt 9* or *Need for Speed* use the Left/Right arrow keys to steer and Spacebar for nitro. Map these keys to touch pins, wrap some cardboard in aluminum foil, and build your own wireless steering wheel!
-2. **Banana Piano:** Map touch pins to letters like `a`, `s`, `d`, `f`, `g`. Stick the jumper wires into pieces of fruit (or cups of water). Open an online synthesizer website and play the piano by tapping the fruit.
-3. **The Ultimate "Boss Key":** Wire up a massive red arcade button under your desk. Program the ESP32 so that when you hit the button, it instantly sends `Win + D` (or `Cmd + F3` on Mac) to minimize all your open windows.
-4. **TikTok / YouTube Shorts Ring:** Attach a tiny battery to your ESP32 and map a small push button to the "Down Arrow" key. You can now remotely swipe to the next video from across the room without touching your phone.
-5. **Musician's Page Turner:** Reading sheet music on an iPad? Build a custom foot pedal out of wood and tin foil that sends the "Right Arrow" key so you can turn the page without taking your hands off your instrument.
+### 🚨 3. The Ultimate "Boss Key"
+A massive physical button hidden under your desk that instantly hides all your windows when someone walks into the room.
+* **The Build:** Get a physical arcade button or push-switch. Wire one leg to `GND` and the other leg to Pin 15. 
+* **How it works:** Instead of touch, this uses a physical digital switch. When pressed, it sends `Windows Key + D` (or `Cmd + F3` on Mac) to minimize everything instantly.
+* **The Code:**
+```python
+from ble_keyboard import BLEKeyboard
+from machine import Pin
+import time
+
+kb = BLEKeyboard("Boss_Key")
+# Use internal pull-up resistor. Button press connects to Ground (0)
+btn = Pin(15, Pin.IN, Pin.PULL_UP) 
+
+while True:
+    if kb.is_connected():
+        if btn.value() == 0: # Button pressed
+            print("Hiding windows!")
+            kb.win_d() # Sends Win+D
+            # Wait for button release
+            while btn.value() == 0: 
+                time.sleep_ms(20)
+    time.sleep_ms(50)
+```
+
+### 📱 4. Wearable TikTok / YouTube Shorts Scroller
+A tiny remote so you can swipe to the next video from across the room without touching your phone.
+* **The Build:** Tape a small jumper wire to your index finger (connected to Pin 4). Connect a battery to your ESP32. 
+* **How it works:** Pair the ESP32 to your iOS/Android phone. Simply tap your thumb and index finger together to trigger the "Down Arrow", which scrolls to the next video.
+* **The Code:**
+```python
+from ble_keyboard import BLEKeyboard
+from machine import Pin, TouchPad
+import time
+
+kb = BLEKeyboard("Tok_Scroller")
+thumb_tap = TouchPad(Pin(4))
+
+while True:
+    if kb.is_connected():
+        if thumb_tap.read() < 300:
+            kb.arrow_down()
+            while thumb_tap.read() < 300:
+                time.sleep_ms(20)
+    time.sleep_ms(50)
+```
+
+### 🎼 5. Musician's Page Turner Foot Pedal
+Reading sheet music on an iPad while playing guitar or piano? Build a custom foot pedal to turn the pages.
+* **The Build:** Create a simple cardboard hinge pedal. Put foil on the top and bottom flaps so they touch when you step on it. Connect one foil to GND, and the other to Pin 15.
+* **How it works:** Stepping on the pedal sends a single "Right Arrow" press to flip the PDF page. It includes a long delay so you don't accidentally skip two pages!
+* **The Code:**
+```python
+from ble_keyboard import BLEKeyboard
+from machine import Pin
+import time
+
+kb = BLEKeyboard("Page_Turner")
+pedal = Pin(15, Pin.IN, Pin.PULL_UP) 
+
+while True:
+    if kb.is_connected():
+        if pedal.value() == 0: # Pedal pressed
+            kb.arrow_right()
+            # 1-second delay so you don't accidentally double-flip!
+            time.sleep(1) 
+    time.sleep_ms(50)
+```
 
 ---
 
