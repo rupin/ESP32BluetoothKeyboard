@@ -6,9 +6,9 @@ Unlike standard BLE libraries that suffer from infinite disconnect/reconnect loo
 
 ## ✨ Features
 * **Full QWERTY Support:** Type strings, press individual keys, or use modifiers (Ctrl, Alt, Shift, Win).
-* **Touch-Capacitive Integration:** Includes examples for mapping ESP32 touch pins directly to keystrokes.
+* **Touch-Capacitive Integration:** Easily map ESP32 touch pins directly to keystrokes.
 * **Persistent Auto-Reconnect:** Saves BLE bonding keys so you don't have to re-pair after every reboot.
-* **Cross-Platform:** Works on Windows 10/11, macOS, Android, and iOS.
+* **Cross-Platform:** Works seamlessly on Windows 10/11, macOS, Android, and iOS.
 
 ---
 
@@ -35,18 +35,33 @@ It effectively turns a kernel panic into an automated "One-Time Setup Reboot"!
 
 ---
 
-## 🚀 Installation
+## 🚀 Installation & Getting Started
 
 1. Flash your ESP32 with **MicroPython v1.20 or newer** (v1.27+ recommended).
 2. Using your preferred IDE (Thonny is highly recommended for beginners), upload the `ble_keyboard.py` library file to the root directory of your ESP32.
-3. Once the library is saved to the board, you can open `main.py` in your IDE, paste any of the example codes below, and click "Run" to execute it directly on the board.
+3. Upload `example_kb.py` to the board and run it.
+
+### Running the Example (`example_kb.py`)
+The provided example script turns your ESP32 into a two-button touch keyboard. 
+
+**Hardware Connections:**
+* Take two male-to-male jumper wires (or alligator clips).
+* Plug one wire into **GPIO 4** (Pin 4).
+* Plug the second wire into **GPIO 13** (Pin 13).
+* Leave the other ends of the wires loose.
+
+**What to do:**
+1. Run `example_kb.py` in your IDE.
+2. Open your computer's Bluetooth settings and pair to **"ESP32_KB_Main"**.
+3. Once connected, physically tap the exposed metal end of the wire connected to **Pin 4**. It will act as the **Left Arrow** key.
+4. Tap the wire connected to **Pin 13**. It will act as the **Right Arrow** key.
 
 ---
 
 ## 📖 Usage Guide
 
 ### 🟢 Level 1: Beginner (Basic Keystrokes)
-To use the library, instantiate the `BLEKeyboard` object and wait for a connection.
+To use the library in your own projects, instantiate the `BLEKeyboard` object and wait for a connection.
 
 ```python
 from ble_keyboard import BLEKeyboard
@@ -85,7 +100,7 @@ while True:
 
         try:
             if touch_left.read() < THRESHOLD:
-                # Copy text using modifier
+                # Copy text using modifier (Ctrl+C)
                 kb.ctrl_c() 
 
                 # Wait for finger release (Debounce)
@@ -99,28 +114,17 @@ while True:
     time.sleep_ms(50)
 ```
 
-### 🔴 Level 3: Advanced (The "Escape Hatch" Pairing Button)
-Windows 11 Bluetooth caching is notoriously buggy. If a student maxes out their Bluetooth device limit, or the Windows NimBLE cache gets permanently corrupted, the ESP32 will fall into an infinite "Connected -> Disconnected" loop.
+---
 
-You can build a hardware "Escape Hatch" using the ESP32's `BOOT` button (Pin 0). If held during power-on, it generates a random device name, tricking Windows into treating it as a brand-new device without having to dig into OS settings.
+## 💡 Project Inspiration (What can you build with this?)
 
-```python
-from ble_keyboard import BLEKeyboard
-from machine import Pin
-import random
+Because the ESP32 acts exactly like a standard USB keyboard, you can use it to interact with almost any software. Here are 5 project ideas to get you started:
 
-pair_btn = Pin(0, Pin.IN, Pin.PULL_UP)
-
-if pair_btn.value() == 0:
-    # Button held: Bypass Windows cache with new name
-    device_name = f"ESP_KB_{random.randint(100, 999)}"
-else:
-    # Normal boot
-    device_name = "ESP32_KB_Main"
-
-kb = BLEKeyboard(device_name)
-# ... continue with main loop
-```
+1. **Cardboard Racing Controller:** Games like *Asphalt 9* or *Need for Speed* use the Left/Right arrow keys to steer and Spacebar for nitro. Map these keys to touch pins, wrap some cardboard in aluminum foil, and build your own wireless steering wheel!
+2. **Banana Piano:** Map touch pins to letters like `a`, `s`, `d`, `f`, `g`. Stick the jumper wires into pieces of fruit (or cups of water). Open an online synthesizer website and play the piano by tapping the fruit.
+3. **The Ultimate "Boss Key":** Wire up a massive red arcade button under your desk. Program the ESP32 so that when you hit the button, it instantly sends `Win + D` (or `Cmd + F3` on Mac) to minimize all your open windows.
+4. **TikTok / YouTube Shorts Ring:** Attach a tiny battery to your ESP32 and map a small push button to the "Down Arrow" key. You can now remotely swipe to the next video from across the room without touching your phone.
+5. **Musician's Page Turner:** Reading sheet music on an iPad? Build a custom foot pedal out of wood and tin foil that sends the "Right Arrow" key so you can turn the page without taking your hands off your instrument.
 
 ---
 
@@ -145,7 +149,7 @@ To force Windows 11 to initiate a bonding sequence, the BLE Characteristics must
 In `ble_keyboard.py`, you will notice we hardcoded the raw hex values (e.g., `0x0200` for `FLAG_READ_ENCRYPTED`). Do not change these, or Windows will refuse to pair.
 
 ### 3. Memoryviews vs. JSON serialization
-When MicroPython triggers `_IRQ_SET_SECRET` to hand over the Bluetooth passwords, it provides them as `memoryview` objects. The standard Python `json.dump()` function will crash with a `TypeError` if you try to save a memoryview or a `bytes` object. We bypass this complexity entirely by relying on the "dirty save" crash, but if you attempt to rewrite this using standard JSON saves, you must convert keys to `.hex()` strings first.
+When MicroPython triggers `_IRQ_SET_SECRET` to hand over the Bluetooth passwords, it provides them as `memoryview` objects. The standard Python `json.dump()` function will crash with a `TypeError` if you try to save a memoryview or a `bytes` object. We bypass this complexity entirely by relying on the "dirty save" crash.
 
 ### 4. Mac Name Caching vs. Windows Caching
 * **Windows 11** enforces a strict paired-device limit (usually 7-8 devices). If you use a random name generator on *every* boot, Windows will quickly hit this limit and permanently block the ESP32.
